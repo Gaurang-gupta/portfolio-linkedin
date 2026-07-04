@@ -1,0 +1,256 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>Next.js</Badge>
+  <Badge>TypeScript</Badge>
+  <Badge>MDX</Badge>
+  <Badge>Tailwind CSS</Badge>
+</BadgeGroup>
+
+<Callout type="note" title="Overview">
+  A documentation-driven portfolio system designed to structure and present engineering projects using MDX-based case studies instead of static pages.
+</Callout>
+
+# Problem Statement
+
+Most developer portfolios are tightly coupled systems where content and UI are mixed together.
+
+This creates structural problems:
+
+- Project pages are hardcoded and repetitive
+- Adding new work requires modifying UI code
+- No consistent structure for technical storytelling
+- Content becomes harder to maintain as projects scale
+
+Over time, the portfolio stops being a system and becomes a collection of static pages.
+
+---
+
+# Why I Built It
+
+The goal was to treat a portfolio as a **documentation system**, not a UI surface.
+
+Instead of thinking in terms of pages, the system is designed around structured engineering content.
+
+This shift enables:
+
+- Separation of content and rendering logic
+- Consistent technical storytelling across projects
+- Scalable project addition without UI changes
+- A reusable format for engineering case studies
+
+# System Architecture
+
+The portfolio is designed as a layered content-rendering system rather than a static UI.
+
+At its core, it separates:
+
+- Project metadata (data layer)
+- Case study content (MDX layer)
+- Presentation logic (UI components)
+
+---
+
+<Mermaid
+  caption="High-level architecture of engineering portfolio."
+  chart={`
+    flowchart TD
+    A[Project Data]
+    A[Project Data] --> B[MDX Case Studies]
+    B --> C[MDX Renderer]
+    C --> D[Reusable UI Components]
+    D --> E[Final Portfolio Pages]
+  `}
+/>
+
+<Callout type="info" title="Key Design Principle">
+  The portfolio is not a collection of pages.
+  It is a rendering system over structured engineering documentation.
+</Callout>
+
+# Engineering Decisions
+
+This system was designed around a strict separation between content, structure, and rendering logic.
+
+Each decision below was made to improve scalability and maintainability of the portfolio as a long-term system.
+
+---
+
+<ArchitectureDecision title="1. Data-Driven Project Model">
+  All project metadata is stored in a centralized TypeScript data layer instead of being embedded in UI components.
+
+  This ensures:
+  - Single source of truth for all projects
+  - Consistent rendering across pages
+  - Easy addition of new projects without UI changes
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="2. MDX as the Content Layer">
+  All case studies are written in MDX instead of static JSX pages.
+
+  This allows:
+  - Embedding structured UI components inside documentation
+  - Separation of writing from presentation
+  - A consistent format for engineering narratives
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="3. Component-Based Documentation System">
+  Custom MDX components are used to enforce structure across all case studies.
+
+  Key components include:
+  - Callout → system insights and clarifications
+  - Badge → technology stack representation
+  - ArchitectureDecision → design rationale
+  - Step → structured workflows
+
+  This prevents inconsistent storytelling across projects.
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="4. Slug-Based Routing System">
+  Each project is resolved using a slug-based routing system.
+
+  This enables:
+  - Decoupled routing from content structure
+  - Scalable project additions without page creation
+  - Clean and predictable URL structure
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="5. Separation of Content and Presentation">
+  Rendering logic is completely isolated from project content.
+
+  This ensures:
+  - UI changes do not affect content structure
+  - Content can evolve independently
+  - Long-term maintainability of the system
+</ArchitectureDecision>
+
+# Implementation
+
+The system is implemented as a layered architecture with clear separation between data, content, and rendering logic.
+
+---
+
+## 1. Project Data Layer
+
+All project metadata is defined in a structured TypeScript object.
+
+This includes:
+- Title and description
+- Technical focus areas
+- Repository links
+- Summary attributes for UI rendering
+- Featured flag for prioritization
+
+This layer acts as the **single source of truth** for all project listings.
+
+---
+
+## 2. MDX Case Study Layer
+
+Each project is written in MDX and treated as structured documentation.
+
+This enables:
+- Embedding reusable UI components inside technical writing
+- Maintaining consistent formatting across all projects
+- Separating content from UI implementation
+
+---
+
+## 3. Rendering Pipeline
+
+The rendering flow is deterministic:
+
+1. Resolve project by slug
+2. Load corresponding MDX file
+3. Inject MDX into custom renderer
+4. Wrap output with shared layout components
+
+This ensures consistent structure across all case studies.
+
+---
+
+## 4. Component System
+
+A small set of reusable MDX primitives is used across all documentation:
+
+- **Badge** → Technology representation
+- **Callout** → Insights, warnings, and notes
+- **ArchitectureDecision** → Design rationale
+- **Step** → Structured workflows
+
+These components enforce consistency in technical communication.
+
+---
+
+# Challenges & Trade-offs
+
+## 1. Maintaining Consistent Documentation Structure
+
+MDX flexibility can lead to inconsistent writing styles across projects.
+
+**Solution:**
+Strictly limiting allowed components and enforcing a consistent writing pattern across all case studies.
+
+---
+
+## 2. Avoiding Content-UI Coupling
+
+A common risk is embedding layout logic inside MDX content.
+
+**Solution:**
+Keeping layout strictly separate from content and only exposing controlled primitives to MDX.
+
+---
+
+## 3. Scaling Project Structure
+
+As the number of projects increases, duplication and inconsistency become risks.
+
+**Solution:**
+A centralized data layer combined with reusable MDX components ensures scalability without structural drift.
+
+---
+
+## 4. Balancing Flexibility vs Structure
+
+Too much flexibility in MDX reduces consistency, while too much structure reduces expressiveness.
+
+**Solution:**
+A constrained component system that provides enough flexibility for storytelling without breaking format consistency.
+
+---
+
+# Lessons Learned
+
+The portfolio evolved from a static collection of pages into a structured engineering documentation system.
+
+Instead of treating projects as isolated UI pages, they are now represented as modular, reusable case studies driven by a consistent architecture.
+
+Key improvements:
+
+- Strong separation between content and presentation
+- Scalable project addition without UI modifications
+- Consistent engineering narrative across all case studies
+- Reusable documentation primitives for technical communication
+
+<Callout type="success" title="Core Insight">
+  A portfolio is not a UI surface.
+  It is a system for communicating engineering thinking through structured documentation.
+</Callout>
+
+---
+
+# Future Improvements
+
+- Tag-based project categorization system
+- Full-text search across case studies
+- Automatic summary generation from project metadata
+- Versioned case studies for tracking project evolution over time

@@ -1,36 +1,254 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Engineering Portfolio System
 
-## Getting Started
+A documentation-driven portfolio system built to present software engineering and AI projects through structured technical case studies instead of traditional portfolio pages.
 
-First, run the development server:
+Rather than treating the portfolio as a collection of UI screens, this project separates content, presentation, and rendering into independent layers, making it easy to scale, maintain, and extend over time.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+# Why This Project Exists
+
+Most developer portfolios become difficult to maintain as they grow.
+
+Common problems include:
+
+- Hardcoded project pages
+- Repeated layout logic
+- Inconsistent project documentation
+- Tight coupling between content and UI
+
+This project approaches the portfolio as an engineering documentation system where project metadata, technical content, and presentation remain independent.
+
+---
+
+# High-Level Architecture
+
+```
+                     Project Metadata
+                     (TypeScript)
+                           │
+                           ▼
+                 MDX Case Studies
+                           │
+                           ▼
+                  MDX Rendering Layer
+                           │
+                           ▼
+             Reusable Documentation Components
+                           │
+                           ▼
+                  Generated Portfolio Pages
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Design Principles
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Content First
 
-## Learn More
+Projects are treated as structured engineering documentation rather than UI pages.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Separation of Concerns
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The system separates:
 
-## Deploy on Vercel
+- Project metadata
+- Case study content
+- Rendering logic
+- Shared UI components
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Each layer has a single responsibility.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Reusable Documentation
+
+Instead of repeating layouts, reusable MDX components provide consistent technical communication.
+
+Examples include:
+
+- Architecture decisions
+- Callouts
+- Technology badges
+- Implementation steps
+- Mermaid diagrams
+- Code blocks
+
+---
+
+## Scalable by Design
+
+Adding a new project only requires:
+
+1. Adding metadata
+2. Writing one MDX file
+3. Adding project assets
+
+No page development is required.
+
+---
+
+# Core Components
+
+## Project Data Layer
+
+Centralized metadata describing:
+
+- title
+- description
+- repositories
+- summary
+- featured projects
+- cover images
+
+Acts as the single source of truth.
+
+---
+
+## MDX Content Layer
+
+Every project is documented as an engineering case study.
+
+Typical structure includes:
+
+- Overview
+- Problem Statement
+- System Architecture
+- Engineering Decisions
+- Implementation
+- Challenges
+- Lessons Learned
+- Future Improvements
+
+---
+
+## Rendering Layer
+
+Dynamic routing loads project metadata and corresponding MDX content, rendering everything through a shared component registry.
+
+---
+
+## Documentation Components
+
+Custom MDX components provide structured technical writing.
+
+Examples:
+
+- Badge
+- Callout
+- ArchitectureDecision
+- Step
+- Mermaid
+- CodeBlock
+
+---
+
+# Project Structure
+
+```
+app/
+├── about/
+├── contact/
+├── projects/
+│   └── [slug]/
+├── resume/
+
+components/
+├── layout/
+├── mdx/
+├── navigation/
+├── project/
+└── sections/
+
+content/
+└── projects/
+
+data/
+├── about.ts
+├── contact.ts
+├── projects.ts
+└── resume.ts
+
+lib/
+└── content/
+
+public/
+└── images/
+```
+
+---
+
+# Technology Stack
+
+## Frontend
+
+- Next.js 15
+- React
+- TypeScript
+- Tailwind CSS v4
+- shadcn/ui
+
+## Content
+
+- MDX
+- Mermaid
+
+## Deployment
+
+- Vercel
+
+---
+
+# Key Engineering Decisions
+
+- MDX for structured engineering documentation
+- Type-safe project metadata
+- Dynamic project routing
+- Component-driven documentation
+- Reusable layout primitives
+- Separation between content and presentation
+
+---
+
+# Current Features
+
+- Responsive portfolio
+- Dynamic project pages
+- MDX-based engineering case studies
+- Theme support
+- Data-driven resume
+- Contact page
+- Project filtering through metadata
+- GitHub repository links
+
+---
+
+# Future Improvements
+
+- Project search
+- Tag-based filtering
+- Reading time estimation
+- RSS feed
+- Versioned project documentation
+- Analytics dashboard
+- Automatic Open Graph image generation
+
+---
+
+# Philosophy
+
+This project is intentionally minimal.
+
+The objective is not to build the most visually complex portfolio.
+
+The objective is to communicate engineering decisions, architectural thinking, and production-oriented software design in a structured, maintainable format.
+
+The portfolio itself follows the same principles as the systems it showcases:
+
+- Clear separation of concerns
+- Reusable components
+- Scalability
+- Maintainability
+- Documentation as a first-class asset

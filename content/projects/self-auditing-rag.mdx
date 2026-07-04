@@ -1,0 +1,207 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>Python</Badge>
+  <Badge>FastAPI</Badge>
+  <Badge>LangChain</Badge>
+  <Badge>FAISS</Badge>
+  <Badge>Sentence Transformers</Badge>
+  <Badge>HuggingFace</Badge>
+</BadgeGroup>
+
+This project implements a production-style Retrieval-Augmented Generation (RAG) system that prioritizes reliability over always producing an answer. Rather than trusting the language model by default, the system evaluates both the user query and retrieved evidence before generation.
+
+Two auditing stages introduce explicit decision boundaries. The first determines whether a query contains enough information to retrieve meaningful documents, while the second verifies that the retrieved context is sufficiently relevant and consistent before allowing the LLM to respond.
+
+<Callout type="note" title="Engineering Focus">
+
+The primary objective was to design a RAG pipeline that makes transparent, evidence-based decisions instead of relying solely on prompt engineering.
+
+The implementation focuses on:
+
+- Multi-stage validation
+- Controlled generation
+- Evidence-based confidence
+- Observable decision making
+- Failure-first system design
+
+</Callout>
+
+# Problem Statement
+
+Many RAG applications generate answers whenever a question is received, even when the query is ambiguous or the retrieved context is weak. This often leads to hallucinations that appear confident despite having little supporting evidence.
+
+<Callout type="info" title="Project Objective">
+
+Build a retrieval pipeline that can refuse to answer when confidence is insufficient, treating uncertainty as a system decision rather than an LLM limitation.
+
+</Callout>
+
+The architecture was designed around four core requirements.
+
+<Step number={1} title="Query Validation">
+  Evaluate whether a query contains enough information before performing
+  retrieval.
+</Step>
+
+<Step number={2} title="Evidence-Based Retrieval">
+  Retrieve semantically relevant document chunks using vector search rather than
+  keyword matching.
+</Step>
+
+<Step number={3} title="Retrieval Auditing">
+  Measure retrieval quality before generation using similarity and consistency
+  metrics.
+</Step>
+
+<Step number={4} title="Controlled Generation" isLast>
+  Allow the LLM to generate an answer only when the retrieved evidence satisfies
+  predefined quality thresholds.
+</Step>
+
+# Why I Built It
+
+Most RAG tutorials demonstrate how to connect an LLM to a vector database, but few address when the system should refuse to answer. I wanted to explore how reliability could be enforced through architecture instead of increasingly complex prompts.
+
+<Callout type="note" title="From Chatbot to Decision System">
+
+The project evolved from building a standard RAG application into designing a decision pipeline where every stage explicitly determines whether the system should continue or stop.
+
+</Callout>
+
+The design was driven by questions such as:
+
+- Should retrieval happen for every query?
+- How can retrieval quality be measured objectively?
+- When should the system abstain instead of generating?
+- How can confidence be derived from evidence rather than model output?
+- How can every decision remain observable for debugging?
+
+<ArchitectureDecision title="Audit Before Generation">
+
+Instead of treating generation as the default outcome, the pipeline introduces explicit auditing stages before and after retrieval.
+
+Each component has a single responsibility, allowing unreliable requests to terminate early while only high-confidence retrievals reach the language model.
+
+</ArchitectureDecision>
+
+# System Architecture
+
+<Mermaid
+  caption="High-level architecture of the resume analysis pipeline."
+  chart={`
+  flowchart TD
+  A[User Query]
+  A --> B[Query Auditor]
+  B -->|Clarify| C[Return Clarification]
+  B -->|Proceed| D[Vector Retrieval]
+  D --> E[Retrieval Auditor]
+  E -->|Abstain| F[Return Abstention]
+  E -->|Answer| G[LLM Generation]
+  G --> H[Structured API Response]
+`}
+/>
+
+<ArchitectureDecision title="Validation at Multiple Stages">
+
+Validation occurs both before and after retrieval. Separating these concerns prevents unnecessary computation while reducing hallucinations caused by weak or conflicting context.
+
+</ArchitectureDecision>
+
+<Callout type="success" title="Pipeline Philosophy">
+
+Every stage is responsible for deciding whether the system should continue rather than assuming generation is always appropriate.
+
+</Callout>
+
+# Engineering Decisions
+
+<ArchitectureDecision title="Pre-Retrieval Query Auditor">
+
+Simple heuristics identify underspecified queries before retrieval, reducing wasted computation and improving user feedback.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Retrieval Auditor">
+
+Generation depends on retrieval quality rather than model confidence. Similarity scores and consistency metrics determine whether sufficient evidence exists.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Evidence-Based Confidence">
+
+Confidence scores are derived from retrieval metrics instead of token probabilities, making them easier to interpret and debug.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Structured API Responses">
+
+Every request returns audit decisions, confidence, latency metrics, and retrieval metadata, making system behaviour observable during development and testing.
+
+</ArchitectureDecision>
+
+# Implementation
+
+<Step number={1} title="Document Processing">
+
+Source documents are chunked with overlap, embedded using Sentence Transformers, and indexed in FAISS.
+
+</Step>
+
+<Step number={2} title="Query Auditing">
+
+Incoming queries are analyzed for specificity before retrieval begins.
+
+</Step>
+
+<Step number={3} title="Retrieval & Validation">
+
+Relevant chunks are retrieved and evaluated using similarity-based metrics.
+
+</Step>
+
+<Step number={4} title="Controlled Generation">
+
+Only validated context is provided to the language model for answer generation.
+
+</Step>
+
+<Step number={5} title="Structured Response" isLast>
+
+The API returns the generated answer (or abstention), audit results, confidence score, and per-stage latency metrics.
+
+</Step>
+
+# Challenges & Trade-offs
+
+- Choosing thresholds that reject poor retrieval without blocking legitimate queries.
+- Balancing strict auditing against user experience.
+- Designing confidence metrics that reflect retrieval quality instead of model certainty.
+- Keeping each pipeline stage independently testable and observable.
+
+# Lessons Learned
+
+- Reliability comes from system design more than prompt engineering.
+- Refusing to answer can produce a better user experience than confident hallucinations.
+- Confidence should be grounded in evidence, not language model output.
+- Observable pipelines simplify debugging and future improvements.
+
+<Callout type="success" title="Key Takeaway">
+
+The most valuable outcome of this project was learning how architectural decisions can improve the trustworthiness of LLM applications beyond prompt engineering alone.
+
+</Callout>
+
+# Future Improvements
+
+- Adaptive retrieval strategies based on query complexity.
+- Hybrid keyword and semantic retrieval.
+- Reranking using cross-encoder models.
+- Streaming responses with incremental evidence.
+- Automated evaluation datasets for audit thresholds.
+
+<Callout type="info" title="Project Status">
+
+This project is intentionally feature-complete. Its purpose is to demonstrate production-oriented RAG architecture rather than maximize functionality.
+
+</Callout>

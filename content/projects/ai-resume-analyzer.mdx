@@ -1,0 +1,261 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>Next.js</Badge>
+  <Badge>Supabase</Badge>
+  <Badge>Railway</Badge>
+  <Badge>Gemini</Badge>
+  <Badge>Background Worker</Badge>
+  <Badge>PostgreSQL</Badge>
+</BadgeGroup>
+
+The AI Resume Analyzer is a production-oriented SaaS application that evaluates resumes against a specific job opportunity using asynchronous processing and large language models.
+
+Rather than handling AI analysis within the request lifecycle, each submission becomes a background job. Independent workers perform document extraction, prompt generation, and AI inference while the frontend remains responsive.
+
+<Callout type="note" title="Engineering Focus">
+
+  This project focuses on building a reliable AI processing pipeline rather than simply integrating an LLM.
+
+  Key areas include:
+
+  - Asynchronous job processing
+  - Concurrent worker coordination
+  - Database-backed job management
+  - Prompt evaluation
+  - Clear separation between frontend and worker responsibilities
+
+</Callout>
+
+# System Architecture
+
+The application separates user interaction from AI processing. Every resume submission is stored as a background job, allowing document parsing and AI inference to execute independently of the web application.
+
+<ArchitectureDecision title="Asynchronous Processing Pipeline">
+
+  Every analysis request is persisted as a queued job in PostgreSQL. Background workers safely claim available jobs, execute the analysis pipeline, and store the results.
+
+  This architecture keeps the frontend responsive while allowing worker capacity to scale independently.
+
+</ArchitectureDecision>
+
+## Request Lifecycle
+
+<Mermaid
+  caption="High-level architecture of the resume analysis pipeline."
+  chart={`
+flowchart TD
+A[User]
+A --> B[Next.js Frontend]
+B --> C[Backend API]
+C --> D[(Supabase Jobs Table)]
+D --> E[Railway Worker]
+E --> F[Claim Job<br/>FOR UPDATE SKIP LOCKED]
+F --> G[Extract Resume]
+G --> H[Prepare Prompt]
+H --> I[Gemini]
+I --> J[Structured Analysis]
+J --> K[(Supabase)]
+K --> L[Job Status Updated]
+L --> M[Frontend Polling]
+M --> A
+`}
+/>
+
+<Callout type="info" title="Processing Flow">
+
+  1. Create a `queued` job.
+  2. Worker safely claims the job.
+  3. Extract resume and prepare the prompt.
+  4. Generate structured analysis with Gemini.
+  5. Persist results and update the job status.
+  6. Frontend polls for progress until completion.
+
+</Callout>
+
+# Engineering Decisions
+
+The most valuable lessons from this project came from the engineering decisions that shaped the system rather than the AI model itself. The following decisions were made to improve reliability, scalability, and operational correctness.
+
+<ArchitectureDecision title="Database as a Durable Job Queue">
+
+  Resume analyses are stored as database records with explicit lifecycle states (`queued`, `processing`, `completed`, `failed`). This allows PostgreSQL to act as both persistent storage and a lightweight job queue without introducing additional infrastructure.
+
+  Benefits include:
+
+  - Durable job state
+  - Worker recovery after restarts
+  - Built-in operational visibility
+  - Simpler deployment architecture
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Safe Concurrent Processing">
+
+  Multiple workers claim jobs using PostgreSQL's `FOR UPDATE SKIP LOCKED`, ensuring that each job is processed exactly once while allowing workers to poll the queue concurrently.
+
+  <Callout type="info" title="Why FOR UPDATE SKIP LOCKED?">
+
+    It provides reliable distributed job coordination using PostgreSQL alone, avoiding race conditions without requiring an external queue.
+
+  </Callout>
+
+  The system can scale horizontally by simply adding more worker instances.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Explicit Job State Transitions">
+
+  Every analysis follows a predictable lifecycle.
+
+  <Mermaid
+    caption="Job lifecycle used throughout the processing pipeline."
+    chart={`
+stateDiagram-v2
+    [*] --> queued
+    queued --> processing
+    processing --> completed
+    processing --> failed
+    completed --> [*]
+    failed --> [*]
+`}
+  />
+
+  The explicit state machine allows the frontend to report progress accurately while giving the backend a simple, debuggable processing model.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Separation of Responsibilities">
+
+  The application separates user interaction from long-running AI processing, keeping business logic outside the web application.
+
+  | Frontend | Background Worker |
+  |----------|-------------------|
+  | Upload resumes | Extract PDF content |
+  | Submit analysis jobs | Build LLM prompt |
+  | Display job status | Execute AI inference |
+  | Show analysis history | Persist results & update job state |
+
+  This separation keeps the frontend lightweight while allowing the processing pipeline to evolve independently.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Prompt Evaluation as an Engineering Process">
+
+  Prompt development was treated as an engineering problem rather than trial and error. More than ten prompt variations were evaluated using multiple resumes before selecting the version that consistently produced structured and actionable feedback.
+
+  <Callout type="success" title="Key Outcome">
+
+    Systematic prompt evaluation produced significantly more consistent and useful resume analyses than relying on intuition alone.
+
+  </Callout>
+
+</ArchitectureDecision>
+
+# Implementation
+
+<Step number={1} title="Background Job Creation">
+
+  Each resume submission creates a `queued` job and immediately returns control to the frontend. This keeps the request lifecycle short while allowing AI processing to run asynchronously.
+
+</Step>
+
+<Step number={2} title="Processing Pipeline">
+
+  The worker executes a predictable sequence:
+
+  - Claim job
+  - Extract PDF text
+  - Build the LLM prompt
+  - Generate analysis
+  - Validate the response
+  - Persist results
+  - Update job status
+
+  Keeping each stage focused on a single responsibility simplified debugging and future extensions.
+
+</Step>
+
+<Step number={3} title="Prompt Evaluation">
+
+  More than ten prompt variations were evaluated against multiple resumes before selecting the version that consistently produced structured and actionable recommendations.
+
+  <Callout type="success" title="Key Outcome">
+
+    Treating prompt design as an engineering process significantly improved output consistency.
+
+  </Callout>
+
+</Step>
+
+<Step number={4} title="Database-Centered Job Management" isLast>
+
+  The database stores both application data and job state, providing complete visibility into every analysis without introducing additional queueing infrastructure.
+
+</Step>
+
+# Challenges & Trade-offs
+
+<Callout type="warning" title="The Hardest Part">
+
+  Most of the engineering effort went into building a reliable processing pipeline rather than integrating the LLM itself.
+
+</Callout>
+
+### PDF Extraction
+
+Resume layouts vary significantly, making reliable text extraction more challenging than expected. Clean input was essential for producing consistent AI analysis.
+
+---
+
+### Defining Clear Ownership
+
+Several iterations were required before responsibilities settled into a clean architecture:
+
+- **Frontend:** User interaction and job status
+- **Backend API:** Validation and job creation
+- **Worker:** Document processing, AI execution, and persistence
+
+Clear ownership made the system easier to maintain and extend.
+
+---
+
+### Reliable Job Processing
+
+Every analysis was designed to reach a valid terminal state (`completed` or `failed`), simplifying debugging while preventing orphaned jobs.
+
+---
+
+### Choosing Simplicity
+
+Instead of introducing dedicated queueing infrastructure, PostgreSQL together with `FOR UPDATE SKIP LOCKED` provided reliable concurrent job processing with far less operational complexity.
+
+# Lessons Learned
+
+Building the AI pipeline was only part of the project. The more valuable lessons came from designing a reliable asynchronous system around it.
+
+- **Model long-running work explicitly.** A clear job lifecycle simplified both the frontend and backend.
+- **Define ownership early.** Separating responsibilities reduced coupling and improved maintainability.
+- **Treat prompt engineering as engineering.** Systematic evaluation produced more consistent results than trial and error.
+- **Prioritize reliability.** Predictable workflows and operational visibility had a greater impact than the choice of AI model.
+
+<Callout type="success" title="Biggest Takeaway">
+
+  Reliable AI applications are built around well-designed systems. The LLM is only one component of a larger engineering solution.
+
+</Callout>
+
+# Future Improvements
+
+The current architecture provides a solid foundation, with several opportunities for further improvement:
+
+- Support open-ended resume analysis without requiring a job description.
+- Improve observability through richer metrics and logging.
+- Expand prompt evaluation with larger benchmark datasets.
+- Strengthen testing, monitoring, and operational tooling.
+
+<Callout type="info" title="Future Direction">
+
+  The long-term goal is to continue evolving the platform as an example of production-oriented AI engineering, with reliability and maintainability treated as first-class design goals.
+
+</Callout>

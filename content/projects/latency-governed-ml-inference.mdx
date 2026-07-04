@@ -1,0 +1,212 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>Python</Badge>
+  <Badge>FastAPI</Badge>
+  <Badge>Machine Learning</Badge>
+  <Badge>Circuit Breakers</Badge>
+  <Badge>SLOs</Badge>
+  <Badge>Observability</Badge>
+</BadgeGroup>
+
+This project explores how machine learning services behave under production failure conditions rather than focusing on model accuracy. The system serves predictions while enforcing latency objectives through admission control, circuit breakers, rolling performance metrics, and graceful degradation.
+
+Instead of assuming the primary model is always available, the service continuously monitors latency and error rates, routing traffic to a lightweight fallback model when service-level objectives are violated.
+
+<Callout type="note" title="Engineering Focus">
+
+The primary objective was to design a resilient inference service capable of maintaining availability during overload rather than building a higher-accuracy model.
+
+The implementation focuses on:
+
+- Latency-aware system design
+- Circuit breakers
+- Admission control
+- Graceful degradation
+- Production observability
+
+</Callout>
+
+# Problem Statement
+
+Most machine learning projects stop after deploying a model, providing little insight into how the system behaves when latency increases, resources become constrained, or failures occur. In production, these operational concerns often become more important than model accuracy.
+
+<Callout type="info" title="Project Objective">
+
+Design an inference service that prioritizes availability and predictable behavior under load, while making operational decisions transparent through measurable system metrics.
+
+</Callout>
+
+The architecture was designed around four core requirements.
+
+<Step number={1} title="Latency SLO Enforcement">
+  Continuously monitor request latency and detect SLO violations before service
+  quality degrades further.
+</Step>
+
+<Step number={2} title="Graceful Degradation">
+  Automatically route traffic to a fallback model when the primary service
+  becomes unhealthy.
+</Step>
+
+<Step number={3} title="Admission Control">
+  Limit concurrent requests to prevent resource exhaustion and uncontrolled
+  queue growth.
+</Step>
+
+<Step number={4} title="Operational Visibility" isLast>
+  Expose latency, error rates, circuit breaker state, and fallback usage to make
+  system behaviour observable.
+</Step>
+
+# Why I Built It
+
+Most ML portfolios demonstrate that a model can produce predictions. I wanted to explore the engineering challenges that arise after deployment, where reliability, latency, and system behaviour become the primary concerns.
+
+<Callout type="note" title="Beyond Model Accuracy">
+
+The project treats production failures as expected events rather than exceptional cases. Every architectural decision was made to understand how the service behaves when operating outside ideal conditions.
+
+</Callout>
+
+The design was driven by questions such as:
+
+- How should an inference service respond when latency exceeds its target?
+- When should requests be rejected instead of queued?
+- How can degraded service remain available?
+- Which metrics best reflect overall system health?
+- How can overload behaviour be reproduced and analyzed?
+
+<ArchitectureDecision title="Failure as a First-Class Design Concern">
+
+The system assumes that latency spikes and overload will eventually occur. Instead of attempting to eliminate failures entirely, it introduces mechanisms that detect, contain, and expose them while preserving service availability.
+
+</ArchitectureDecision>
+
+# System Architecture
+
+<Mermaid
+  caption="High-level architecture of the resume analysis pipeline."
+  chart={`
+    flowchart TD
+    A[Client Request]
+    A --> B[Admission Control]
+    B --> C[Primary Model]
+    C --> D[Rolling Metrics]
+    D --> E{SLO Violated?}
+    E -->|No| F[Prediction]
+    E -->|Yes| G[Circuit Breaker]
+    G --> H[Fallback Model]
+    H --> I[Prediction]
+    D --> J[Observability Metrics]
+  `}
+/>
+
+<ArchitectureDecision title="Control Through Feedback">
+
+Operational metrics continuously influence request routing decisions. Rather than serving predictions unconditionally, the system adapts based on measured latency and error rates.
+
+</ArchitectureDecision>
+
+<Callout type="success" title="Pipeline Philosophy">
+
+Inference is treated as a production service where reliability is determined by system behaviour, not just model performance.
+
+</Callout>
+
+# Engineering Decisions
+
+<ArchitectureDecision title="Rolling Window Metrics">
+
+Latency and error rates are computed over a rolling window, allowing routing decisions to reflect recent service behaviour rather than individual requests.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Circuit Breaker Protection">
+
+Traffic is redirected to a fallback model when latency or error thresholds exceed predefined SLOs, reducing the impact of sustained failures.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Admission Control">
+
+Bounded concurrency prevents uncontrolled queue growth, protecting system resources during periods of high demand.
+
+</ArchitectureDecision>
+
+<ArchitectureDecision title="Graceful Degradation">
+
+The fallback model prioritizes continued availability over prediction quality, ensuring requests can still be served during degraded operation.
+
+</ArchitectureDecision>
+
+# Implementation
+
+<Step number={1} title="Request Admission">
+
+Incoming requests pass through bounded concurrency limits before reaching the inference pipeline.
+
+</Step>
+
+<Step number={2} title="Primary Inference">
+
+The primary model serves predictions while latency and error metrics are continuously recorded.
+
+</Step>
+
+<Step number={3} title="Health Monitoring">
+
+Rolling performance metrics determine whether service-level objectives remain satisfied.
+
+</Step>
+
+<Step number={4} title="Fallback Routing">
+
+When thresholds are exceeded, the circuit breaker redirects traffic to the fallback model.
+
+</Step>
+
+<Step number={5} title="Metrics & Response" isLast>
+
+Each request contributes to latency, error, and fallback metrics used for operational monitoring.
+
+</Step>
+
+# Challenges & Trade-offs
+
+A sustained load test revealed that switching to the fallback model did not immediately restore P99 latency. Queueing delays and rolling-window metrics continued to dominate end-to-end response times even after the circuit breaker activated.
+
+This demonstrated that latency is determined by the behaviour of the entire system rather than the execution speed of an individual model.
+
+<Callout type="warning" title="Key Observation">
+
+Circuit breakers successfully contained failures, but they could not reverse latency already introduced by queueing and contention.
+
+</Callout>
+
+# Lessons Learned
+
+- Tail latency is a system property, not a model property.
+- Circuit breakers contain failures but cannot immediately recover degraded latency.
+- Admission control is one of the most effective defences against overload.
+- Production metrics should describe system behaviour honestly rather than present optimistic results.
+
+<Callout type="success" title="Key Takeaway">
+
+The most valuable outcome of this project was understanding that production ML engineering is primarily a systems engineering problem, where reliability depends on architecture rather than model accuracy alone.
+
+</Callout>
+
+# Future Improvements
+
+- Queue-aware request routing.
+- Dedicated capacity for fallback inference.
+- Multi-tier latency objectives for degraded operation.
+- Adaptive admission control based on system load.
+- Distributed deployment with horizontal scaling.
+
+<Callout type="info" title="Project Status">
+
+This project is intentionally complete. Its purpose is to demonstrate production-oriented ML systems engineering and failure analysis rather than maximize functionality.
+
+</Callout>
