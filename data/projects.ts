@@ -126,12 +126,12 @@ export const projects: Project[] = [
     repositories: [
       {
         name: "Repository",
-        url: "https://github.com/YOUR_USERNAME/your-portfolio-repo",
+        url: "https://github.com/Gaurang-gupta/portfolio-linkedin",
       },
     ],
 
     featured: false,
-    demoUrl: "https://ai-resume-analyzer-frontend-sage.vercel.app",
+    demoUrl: "https://portfolio-linkedin-kappa.vercel.app/",
     summary: [
       {
         label: "Status",
