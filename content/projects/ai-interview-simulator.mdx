@@ -1,0 +1,236 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>Next.js 16</Badge>
+  <Badge>React 19</Badge>
+  <Badge>Supabase</Badge>
+  <Badge>Google Gemini</Badge>
+  <Badge>Zod</Badge>
+  <Badge>Tailwind CSS 4</Badge>
+</BadgeGroup>
+
+<Callout type="note" title="Overview">
+  A Next.js + Supabase application that generates topic-based mock interview questions, evaluates free-form answers with AI, and tracks learning progress across attempts.
+</Callout>
+
+# Problem Statement
+
+Practicing for technical interviews is usually unstructured.
+
+This creates real gaps for learners:
+
+- No consistent way to get topic-specific mock questions on demand
+- Free-form answers go unevaluated, or are evaluated inconsistently
+- No historical record of how understanding improves over time
+- No adaptive difficulty based on prior performance
+
+Without a system behind it, "practicing interviews" just becomes ad-hoc note-taking.
+
+---
+
+# Why I Built It
+
+The goal was to treat interview prep as a **closed feedback loop**, not a static question bank.
+
+Instead of just listing questions, the system is designed around a full learner flow: dashboard → topic/level selection → question session → AI evaluation → history analytics.
+
+This shift enables:
+
+- Structured, repeatable practice sessions per topic and difficulty level
+- AI evaluation with reproducible, schema-validated output
+- A persistent record of attempts for tracking improvement
+- A foundation for adaptive, role-based interview tracks
+
+# System Architecture
+
+The app is built as a database-backed learning loop rather than a static quiz app.
+
+At its core, it separates:
+
+- Topic/session data (Supabase Postgres)
+- Question generation and answer evaluation (AI layer)
+- Attempt lifecycle and analytics (server actions + logging)
+
+---
+
+<Mermaid
+  caption="High-level architecture of the AI Interview Simulator."
+  chart={`
+    flowchart TD
+    A[Topic Selection] --> B[Question Generation - Gemini]
+    B --> C[Interview Session]
+    C --> D[Free-form Answer]
+    D --> E[AI Evaluation - Zod-validated Output]
+    E --> F[Attempt Record - Supabase]
+    F --> G[History and Analytics]
+  `}
+/>
+
+<Callout type="info" title="Key Design Principle">
+  An interview simulator is not a question bank.
+  It is a scored feedback loop that learns what a user has and hasn't mastered.
+</Callout>
+
+# Engineering Decisions
+
+This system was designed around database-first data ownership, schema-validated AI output, and an auditable attempt history.
+
+---
+
+<ArchitectureDecision title="1. Database-First Topic Model">
+  Topics are read from a `topics` table with a safe fallback catalog rather than being hardcoded in UI constants.
+
+  This ensures:
+  - Topic cards route using DB slugs instead of hardcoded IDs
+  - Topics can be added or edited without a code deploy
+  - A single source of truth for topic metadata
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="2. Schema-Validated AI Output">
+  All AI-generated questions and evaluations are constrained using Zod schemas via the AI SDK's structured output support.
+
+  This allows:
+  - Predictable, parseable evaluation results instead of freeform text
+  - Server-side level validation via a Zod enum
+  - Consistent grading structure across every attempt
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="3. Attempt Lifecycle Hardening">
+  Attempts move through explicit states rather than free-text status strings.
+
+  Key additions:
+  - Status constraints (`in_progress`, `submitted`, `completed`, `failed`, `abandoned`)
+  - Timing fields: `started_at`, `completed_at`, `duration_seconds`
+  - `prompt_version` and `model_name` metadata for reproducibility
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="4. Slug-Based Routing Consistency">
+  Retry and review flows route by a topic slug snapshot taken at attempt-creation time, instead of a topic UUID.
+
+  This enables:
+  - Consistent URLs across the session, retry, and history flows
+  - Decoupling routing from any single DB identifier
+  - Fewer broken links as topic data evolves
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="5. Observability by Default">
+  A structured request logger with request IDs and attempt event logging (`attempt_started`, `attempt_completed`) was added early rather than bolted on later.
+
+  This ensures:
+  - Debuggable server actions in production
+  - A base layer for future cost and model-drift tracking
+  - Analytics events that can feed later KPI dashboards
+</ArchitectureDecision>
+
+# Implementation
+
+The system is implemented as a layered flow across data, AI generation/evaluation, and presentation.
+
+---
+
+## 1. Data Layer
+
+Core Supabase Postgres tables:
+
+- `topics` — topic metadata, slugs, and fallback catalog
+- `attempts` — per-session state, timing, and prompt/model metadata
+- `attempt_events` — structured analytics events per attempt
+
+Row ownership is enforced via Supabase Auth checks inside server actions.
+
+---
+
+## 2. AI Generation & Evaluation Layer
+
+Question generation and answer evaluation both run through the AI SDK against Google Gemini (`@ai-sdk/google`), constrained by Zod schemas so the output shape is predictable regardless of model phrasing.
+
+---
+
+## 3. Session & Retry Flow
+
+The rendering flow for a session is deterministic:
+
+1. Resolve topic by slug (DB-first, fallback catalog if needed)
+2. Generate topic/level-appropriate questions
+3. Collect and validate the free-form answer (server + client minimum length checks)
+4. Evaluate the answer and persist the attempt with prompt/model metadata
+
+---
+
+## 4. History & Analytics
+
+Past attempts are surfaced on a history page, backed by attempt and attempt-event records, giving a running view of topic-level performance over time.
+
+---
+
+# Challenges & Trade-offs
+
+## 1. Hardcoded Topics vs. Database as Source of Truth
+
+Topic metadata originally lived in `constants/topicList.tsx`, including UUIDs, which drifted from the `topics` table.
+
+**Solution:**
+Migrating topic reads to the database with slugs as the routing key, while keeping a temporary fallback list during the transition.
+
+---
+
+## 2. Routing Inconsistency Between Slug and UUID
+
+Some links used topic slugs while the retry flow in results used topic UUIDs, causing inconsistent routing.
+
+**Solution:**
+Storing a `topic_slug_snapshot` on attempt creation and routing retries by slug everywhere.
+
+---
+
+## 3. Trust in AI-Evaluated Answers
+
+Free-form answers scored by a model risk being inconsistent or unreviewable.
+
+**Solution:**
+Enforcing structured, Zod-validated evaluation output plus `prompt_version` and `model_name` metadata on every attempt, so scoring can be audited and compared across model/prompt changes.
+
+---
+
+## 4. Reliability at Scale
+
+Heavy use of `.select("*")` and client-side fetches risked overfetching as usage grew.
+
+**Solution:**
+Tracked as an explicit reliability gap, with structured logging and indexed queries (`user_id, created_at`, `user_id, topic_id, level, created_at`) added as the first steps toward addressing it.
+
+---
+
+# Lessons Learned
+
+The project evolved from a boilerplate question-and-answer demo into a database-backed learning system with an auditable attempt history.
+
+Key improvements:
+
+- Database-first topic model instead of hardcoded constants
+- Schema-validated AI output for reproducible evaluation
+- Hardened attempt lifecycle with explicit states and timing data
+- Structured logging and analytics events built in from Phase 1
+
+<Callout type="success" title="Core Insight">
+  An AI evaluation feature is only as trustworthy as its ability to be audited.
+  Prompt versioning and structured output aren't polish — they're what make the scoring defensible.
+</Callout>
+
+---
+
+# Future Improvements
+
+- Role-based interview tracks (backend, frontend, data, ML, SRE) and adaptive follow-up difficulty
+- Per-question rubric categories, confidence scores, and evaluator notes
+- Concept mastery trends, streaks, and weekly summary emails
+- Public challenge mode with a shared leaderboard and shareable result cards
+- Prompt versioning table with model fallback policy and cost/token logging per attempt

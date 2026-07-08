@@ -146,5 +146,40 @@ export const projects: Project[] = [
         value: "MDX",
       },
     ],
+  },
+  {
+    slug: "ai-interview-simulator",
+    title: "AI Interview Simulator",
+    description:
+      "A Next.js + Supabase application that generates topic-based mock interview questions, evaluates free-form answers using AI, and tracks learning progress across attempts.",
+
+    focus:
+      "AI-driven evaluation systems, database-first product architecture, and adaptive learning experience design.",
+
+    coverImage: "/images/projects/ai-interview-simulator/cover.png",
+
+    repositories: [
+      {
+        name: "Repository",
+        url: "https://github.com/Gaurang-gupta/ai-interview-simulator",
+      },
+    ],
+
+    featured: false,
+    demoUrl: "https://ai-interview-simulator-kohl.vercel.app/",
+    summary: [
+      {
+        label: "Status",
+        value: "Production",
+      },
+      {
+        label: "Frontend",
+        value: "Next.js 16",
+      },
+      {
+        label: "AI",
+        value: "Gemini via AI SDK",
+      },
+    ],
   }
 ];
