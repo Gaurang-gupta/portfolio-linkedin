@@ -1,0 +1,201 @@
+# Overview
+
+<BadgeGroup>
+  <Badge>FastAPI</Badge>
+  <Badge>MCP</Badge>
+  <Badge>Supabase</Badge>
+  <Badge>PostgreSQL</Badge>
+  <Badge>Google Gemini</Badge>
+  <Badge>ReportLab</Badge>
+  <Badge>Pydantic v2</Badge>
+</BadgeGroup>
+
+<Callout type="note" title="Overview">
+  A FastAPI backend that migrates a single-file AI stock analysis script into a layered service exposing the same business logic through two adapters — REST and MCP — backed by Supabase (Postgres, Auth, Storage) and a two-call Gemini analysis pipeline.
+</Callout>
+
+# Problem Statement
+
+The starting point was a working but monolithic script: one Python file that fetched news, pulled financials, called Gemini twice, and rendered a PDF — all in one linear `main()`.
+
+That shape has real limits:
+
+- No way to call the analysis logic from anywhere except the CLI
+- No way for an AI agent (via MCP) to use the same logic an API client would
+- No persistence — every run was a one-off, nothing was saved or attributable to a user
+- No auth — there was no concept of "whose report is this"
+
+Without a service boundary, "run the analysis" and "own the analysis" were the same undifferentiated block of code.
+
+---
+
+# Why I Built It
+
+The goal was to migrate the script's behavior *unchanged* into a structure where REST and MCP are just two thin adapters over one real implementation — not two divergent codepaths that happen to do similar things.
+
+Instead of rewriting the analysis logic, the project follows a strict layering rule end to end: HTTP request or MCP tool call → the same Python function → the same providers (Yahoo Finance, Google News, Gemini) → a structured result.
+
+This shift enables:
+
+- The identical analysis pipeline reachable from a browser client and from any MCP-speaking agent
+- A real auth boundary: every request, from either adapter, is tied to a verified Supabase user before any external call runs
+- Durable output: generated PDFs live in Supabase Storage, linked from a Postgres row, not a local temp file
+- A codebase where "add a third adapter" is additive, not a rewrite
+
+# System Architecture
+
+The backend separates raw external integrations from the business logic that shapes them, and separates that business logic from the two adapters that expose it.
+
+---
+
+<Mermaid
+  caption="High-level architecture of the AI Investment Research Platform."
+  chart={`
+    flowchart TD
+    A[REST Route] --> C[Business Logic Layer]
+    B[MCP Tool] --> C
+    C --> D[company.py / news.py / analysis.py / reports.py / portfolio.py]
+    D --> E[providers.py - Yahoo Finance, Google News, Gemini, Supabase Storage]
+    C --> F[Supabase Postgres]
+    G[auth.py - Supabase JWT] --> A
+    G --> B
+  `}
+/>
+
+<Callout type="info" title="Key Design Principle">
+  One function, two adapters. routes.py and mcp.py never contain business logic themselves — they verify auth, call the same underlying function, and shape the result. If a bug is fixed in company.py, it's fixed for both the API and every MCP client at once.
+</Callout>
+
+# Engineering Decisions
+
+The system was designed around single-source business logic, provider isolation, and an auth boundary that both adapters share.
+
+---
+
+<ArchitectureDecision title="1. providers.py Owns Every External Call">
+  `yfinance`, `feedparser`, `google.genai`, and the Supabase client are imported in exactly one file.
+
+  This ensures:
+  - `company.py` never imports `yfinance` directly — it calls `providers.get_yf_ticker()`
+  - Swapping a data source or LLM touches one file, not every module that happens to use it
+  - The raw-call layer and the business-logic layer can be tested independently
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="2. Auth Verified Before Any Business Logic Runs">
+  Every REST route carries a router-level `Depends(get_current_user_id)`; every MCP tool takes `access_token` as its first argument and calls the same underlying JWT verification.
+
+  This allows:
+  - A hard guarantee that no Yahoo Finance/Gemini call or database write happens for an invalid or missing token
+  - The same verification function (`auth.verify_supabase_token`) shared between the HTTP-header path and the explicit-argument path MCP requires
+  - Fail-safe behavior: a misconfigured server (missing JWT secret) rejects requests rather than silently accepting them
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="3. No Local User Table">
+  Supabase Auth is the single source of identity. There's no local `users` table — every `user_id` column is just the Supabase auth UUID (the JWT's `sub` claim), stored as a string.
+
+  This avoids:
+  - A duplicate, driftable copy of user identity
+  - A separate signup/login flow the backend would need to own and secure itself
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="4. Generated PDFs Live in Supabase Storage, Not Local Disk">
+  `reports.save_report()` builds the PDF locally (ReportLab needs a real file path), uploads it to a per-user folder in Supabase Storage, deletes the local copy, and returns the public Storage URL — which is what gets persisted as `reports.pdf_path`.
+
+  This matters because:
+  - A local file path is meaningless once deployed on a host with an ephemeral filesystem
+  - Reports become durable, shareable URLs instead of files tied to one server instance
+</ArchitectureDecision>
+
+---
+
+<ArchitectureDecision title="5. Duplication Caught Mid-Build, Not Left In">
+  Early on, PDF-path-construction logic was written once into `routes.py` and once into `mcp.py` — a direct violation of "one source of business logic."
+
+  Caught via review, and fixed by pulling the logic into `reports.save_report()`, called identically by both adapters. Left in this writeup deliberately, since catching your own duplication is as much a part of the discipline as avoiding it in the first place.
+</ArchitectureDecision>
+
+# Implementation
+
+The system is implemented as three layers: raw providers, business logic, and adapters.
+
+---
+
+## 1. Provider Layer
+
+`providers.py` contains every raw external call:
+
+- `get_yf_ticker()` — thin `yfinance.Ticker` wrapper
+- `fetch_news()` — raw Google News RSS fetch, locale-aware (India/US/commodity)
+- `_call_gemini()` / `_merge_parts()` — Gemini call with retry/repair, and the 2-part JSON merge
+- `upload_pdf_to_storage()` — uploads to Supabase Storage using the service-role key, returns a public URL
+
+---
+
+## 2. Business Logic Layer
+
+- `company.py` — financial metrics + the detailed context block fed to Gemini
+- `news.py` — fetch + prompt formatting (sentiment/timeline/events explicitly left unimplemented — see below)
+- `analysis.py` — the two-call Gemini prompt construction and orchestration (`run_analysis`)
+- `reports.py` — PDF styling/flowables/builder, plus the shared `save_report()`
+- `portfolio.py` — value, P&L, and sector allocation, computed from live prices
+- `watchlist.py` — CRUD with per-user ownership enforcement on every read and write
+
+---
+
+## 3. Adapter Layer
+
+- `routes.py` — 9 FastAPI endpoints, each a few lines: verify auth (router-level dependency), call one business-logic function, return a Pydantic model
+- `mcp.py` — 5 `FastMCP` tools, same pattern: verify `access_token`, call the identical function `routes.py` calls
+
+---
+
+# Challenges & Trade-offs
+
+## 1. MCP Tools Don't Get an HTTP Authorization Header
+
+FastAPI's dependency injection naturally reads `Authorization` from the request. MCP tools, called over stdio or most transports, don't receive per-call HTTP headers the same way.
+
+**Solution:**
+Split JWT verification into a pure function, `auth.verify_supabase_token(token) -> user_id`, used two ways: wrapped in a FastAPI `Header`-reading dependency for routes, and called directly with an explicit `access_token` argument in every MCP tool.
+
+---
+
+## 2. Keeping providers.py the Only Yahoo Finance Import
+
+The most direct migration of `fetch_financial_metrics` called `yf.Ticker(...)` inline, which would have meant `company.py` importing `yfinance` itself — breaking the "one file per external integration" rule.
+
+**Solution:**
+A one-line substitution: every `yf.Ticker(...)` call in the migrated code became `providers.get_yf_ticker(...)`. Small, mechanical, and necessary for the layering to actually hold rather than just be aspirational.
+
+---
+
+## 3. Schema Changes After Data Already Existed
+
+Removing the local `User` table and changing `user_id` from an `Integer` FK to a `String` UUID happened *after* the app had already run against a live Supabase database with the old schema.
+
+**Solution:**
+`create_all()` only creates missing tables — it doesn't alter existing columns. The fix was operational, not code: drop the affected tables in the Supabase SQL editor before restarting. Documented directly in `models.py` as a comment, not left as a silent trap.
+
+# Lessons Learned
+
+The project moved from "a script that also happens to call an LLM" to a properly bounded service: two live adapters over one business-logic layer, a real auth gate, and durable cloud storage for output — while explicitly not building features (sentiment scoring, portfolio risk, rebalancing) that didn't have a real design behind them yet.
+
+<Callout type="success" title="Core Insight">
+  "One function, two adapters" is easy to state and easy to violate by accident — the PDF-path duplication above happened despite the rule being written into the plan from the start. The discipline isn't writing the rule; it's catching the violation before it ships.
+</Callout>
+
+---
+
+# Future Improvements
+
+- Next.js frontend with Supabase Auth wired into the login flow, calling the same backend
+- Deploy to Render (or similar) as a persistent process — the two-Gemini-call analysis path takes 15–40s, which rules out most serverless free tiers with short request timeouts
+- Alembic migrations in place of `create_all()`
+- A real definition of portfolio risk (concentration, volatility, or beta-based) and a rebalancing strategy, tax-aware for India's LTCG/STCG rules
+- News sentiment and timeline extraction, once there's a concrete design for what "sentiment" should mean here

@@ -181,5 +181,39 @@ export const projects: Project[] = [
         value: "Gemini via AI SDK",
       },
     ],
+  },
+  {
+    slug: "ai-investment-research-platform",
+    title: "AI Investment Research Platform",
+    description:
+      "A FastAPI + MCP backend that migrates a single-file AI stock analysis script into a layered service, exposing the same business logic through both a REST API and MCP tools, backed by Supabase (Postgres, Auth, Storage) and a two-call Gemini analysis pipeline.",
+
+    focus:
+      "Multi-adapter backend architecture, AI-orchestrated financial analysis, and auth-gated agent tooling via MCP.",
+
+    coverImage: "/images/projects/ai-investment-research-platform/cover.png",
+
+    repositories: [
+      {
+        name: "Repository",
+        url: "https://github.com/Gaurang-gupta/investment-research-platform",
+      },
+    ],
+
+    featured: false,
+    summary: [
+      {
+        label: "Status",
+        value: "Backend Complete",
+      },
+      {
+        label: "Backend",
+        value: "FastAPI + MCP",
+      },
+      {
+        label: "AI",
+        value: "Gemini 2.5 Flash",
+      },
+    ],
   }
 ];

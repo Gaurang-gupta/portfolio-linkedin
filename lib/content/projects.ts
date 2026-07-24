@@ -3,6 +3,7 @@ import SelfAuditingRAG from "@/content/projects/self-auditing-rag.mdx";
 import LatencyGovernedMLInference from "@/content/projects/latency-governed-ml-inference.mdx";
 import EngineeringPortfolio from "@/content/projects/engineering-portfolio-system.mdx"
 import AIInterviewSimulator from "@/content/projects/ai-interview-simulator.mdx"
+import AIInvestmentResearchPlatform from "@/content/projects/ai-investment-research-platform.mdx"
 import { projects } from "@/data/projects";
 
 const projectContent = {
@@ -11,6 +12,7 @@ const projectContent = {
   "latency-governed-ml-inference": LatencyGovernedMLInference,
   "engineering-portfolio-system": EngineeringPortfolio,
   "ai-interview-simulator": AIInterviewSimulator,
+  "ai-investment-research-platform": AIInvestmentResearchPlatform
 } as const;
 
 export function getAdjacentProjects(slug: string) {
